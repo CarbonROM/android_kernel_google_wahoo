@@ -380,6 +380,7 @@ static int drawobj_add_sync_fence(struct kgsl_device *device,
 	struct kgsl_drawobj_sync_event *event;
 	struct sync_fence *fence = NULL;
 	unsigned int id;
+	unsigned long flags;
 	int ret = 0;
 
 	fence = sync_fence_fdget(sync->fd);
@@ -403,6 +404,8 @@ static int drawobj_add_sync_fence(struct kgsl_device *device,
 
 	trace_syncpoint_fence(syncobj, fence->name);
 
+	spin_lock_irqsave(&event->handle_lock, flags);
+
 	event->handle = kgsl_sync_fence_async_wait(sync->fd,
 		drawobj_sync_fence_func, event);
 
@@ -411,7 +414,6 @@ static int drawobj_add_sync_fence(struct kgsl_device *device,
 
 		event->handle = NULL;
 		spin_unlock_irqrestore(&event->handle_lock, flags);
-
 		clear_bit(event->id, &syncobj->pending);
 
 		drawobj_put(drawobj);
@@ -422,6 +424,8 @@ static int drawobj_add_sync_fence(struct kgsl_device *device,
 		 */
 		trace_syncpoint_fence_expire(syncobj, (ret < 0) ?
 				"error" : fence->name);
+	} else {
+		spin_unlock_irqrestore(&event->handle_lock, flags);
 	}
 
 	sync_fence_put(fence);
