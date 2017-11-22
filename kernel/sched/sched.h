@@ -1665,6 +1665,7 @@ static inline unsigned long cpu_util_freq(int cpu)
 	return (util >= capacity) ? capacity : util;
 }
 
+unsigned long boosted_cpu_util(int cpu);
 #endif
 
 #ifdef CONFIG_CPU_FREQ_GOV_SCHED
