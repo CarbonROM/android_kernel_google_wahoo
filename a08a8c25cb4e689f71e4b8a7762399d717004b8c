@@ -1,0 +1,4 @@
+{
+  "pushCert": "certificate version 0.1\npusher CBF54FB8 1511628871 -0500\npushee ssh://review.carbonrom.org:29418/CarbonROM/android_kernel_google_wahoo\nnonce 1511628884-27ECC7EF7D6619FF241EE5513898369CA05BC731\n\n0000000000000000000000000000000000000000 a08a8c25cb4e689f71e4b8a7762399d717004b8c refs/for/cr-6.0\n-----BEGIN PGP SIGNATURE-----\n\niQEzBAABCAAdFiEEes0mZaC+fYIfHOUlT7Va2cv1T7gFAloZoEcACgkQT7Va2cv1\nT7ja3ggAnBT1R3yKEGy/0LbihPLPG1bOIizngUd+ptRTBDnTezpGK04Sk0u/FVP6\nYB/JkLHwcM23doPwo9VvL6rpvEvwMuXq2kbfM2ydcU9/5GrQEoX1QPvAg1NEy8V3\nQz5N6CR+HY93w6HilH5PAiWiU0uyMryDxry8/0Idki+7mZUuUdToZdPMoGPvimvO\nd36vTXmorUzmGsn6lygAxOqV1u7ccT1F84iyzLKjPSV6xng5qU+2coIZ0Sfn+f0+\njZdakZvRf1bSg6rcQ0GRyyS68TRCyu7d00pkfPMcvUepajvtFALYq/MnvXdEDlxv\nLgtw4oyukuHe39rA06Veyqhf81UPDA\u003d\u003d\n\u003do2uT\n-----END PGP SIGNATURE-----\n",
+  "comments": []
+}
