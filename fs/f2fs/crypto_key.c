@@ -188,12 +188,7 @@ int f2fs_get_encryption_info(struct inode *inode)
 		keyring_key = NULL;
 		goto out;
 	}
-	if (keyring_key->type != &key_type_logon) {
-		printk_once(KERN_WARNING "f2fs: key type must be logon\n");
-		res = -ENOKEY;
-		goto out;
-	}
-	down_read(&keyring_key->sem);
+	BUG_ON(keyring_key->type != &key_type_logon);
 	ukp = user_key_payload(keyring_key);
 	if (!ukp) {
 		/* key was revoked before we acquired its semaphore */

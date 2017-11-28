@@ -567,6 +567,7 @@ struct mdss_mdp_ctl {
 	struct mdss_mdp_avr_info avr_info;
 	bool commit_in_progress;
 	struct mutex ds_lock;
+	bool need_vsync_on;
 };
 
 struct mdss_mdp_mixer {
@@ -970,6 +971,8 @@ struct mdss_overlay_private {
 	struct task_struct *thread;
 
 	u8 secure_transition_state;
+
+	bool cache_null_commit; /* Cache if preceding commit was NULL */
 };
 
 struct mdss_mdp_set_ot_params {

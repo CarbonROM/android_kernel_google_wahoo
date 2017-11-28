@@ -2357,6 +2357,8 @@ static void __overlay_set_secure_transition_state(struct msm_fb_data_type *mfd)
 	/* Reset the secure transition state */
 	mdp5_data->secure_transition_state = SECURE_TRANSITION_NONE;
 
+	mdp5_data->cache_null_commit = list_empty(&mdp5_data->pipes_used);
+
 	/*
 	 * Secure transition would be NONE in two conditions:
 	 * 1. All the features are already disabled and state remains
@@ -2556,6 +2558,7 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 	ATRACE_BEGIN("sspp_programming");
 	ret = __overlay_queue_pipes(mfd);
 	ATRACE_END("sspp_programming");
+
 	mutex_unlock(&mdp5_data->list_lock);
 
 	mdp5_data->kickoff_released = false;
@@ -4382,7 +4385,7 @@ static int mdss_mdp_hw_cursor_pipe_update(struct msm_fb_data_type *mfd,
 	if (!mfd->cursor_buf && (cursor->set & FB_CUR_SETIMAGE)) {
 		ret = mdss_smmu_dma_alloc_coherent(&pdev->dev,
 			cursor_frame_size, (dma_addr_t *) &mfd->cursor_buf_phys,
-			&mfd->cursor_buf_iova, mfd->cursor_buf,
+			&mfd->cursor_buf_iova, &mfd->cursor_buf,
 			GFP_KERNEL, MDSS_IOMMU_DOMAIN_UNSECURE);
 		if (ret) {
 			pr_err("can't allocate cursor buffer rc:%d\n", ret);
@@ -4570,7 +4573,7 @@ static int mdss_mdp_hw_cursor_update(struct msm_fb_data_type *mfd,
 	if (!mfd->cursor_buf && (cursor->set & FB_CUR_SETIMAGE)) {
 		ret = mdss_smmu_dma_alloc_coherent(&pdev->dev,
 			cursor_frame_size, (dma_addr_t *) &mfd->cursor_buf_phys,
-			&mfd->cursor_buf_iova, mfd->cursor_buf,
+			&mfd->cursor_buf_iova, &mfd->cursor_buf,
 			GFP_KERNEL, MDSS_IOMMU_DOMAIN_UNSECURE);
 		if (ret) {
 			pr_err("can't allocate cursor buffer rc:%d\n", ret);
@@ -4618,7 +4621,7 @@ static int mdss_mdp_hw_cursor_update(struct msm_fb_data_type *mfd,
 
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
 
-	if (cursor->set & FB_CUR_SETIMAGE) {
+	if (mfd->cursor_buf && (cursor->set & FB_CUR_SETIMAGE)) {
 		u32 cursor_addr;
 		ret = copy_from_user(mfd->cursor_buf, img->data,
 				     img->width * img->height * 4);
@@ -4956,10 +4959,11 @@ static int mdss_fb_get_metadata(struct msm_fb_data_type *mfd,
 		ret = mdss_fb_get_hw_caps(mfd, &metadata->data.caps);
 		break;
 	case metadata_op_get_ion_fd:
-		if (mfd->fb_ion_handle) {
+		if (mfd->fb_ion_handle && mfd->fb_ion_client) {
 			get_dma_buf(mfd->fbmem_buf);
 			metadata->data.fbmem_ionfd =
-				dma_buf_fd(mfd->fbmem_buf, 0);
+				ion_share_dma_buf_fd(mfd->fb_ion_client,
+					mfd->fb_ion_handle);
 			if (metadata->data.fbmem_ionfd < 0) {
 				dma_buf_put(mfd->fbmem_buf);
 				pr_err("fd allocation failed. fd = %d\n",

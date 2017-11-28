@@ -43,13 +43,6 @@
 
 #define DEFAULT_BUS_P 25
 
-/*
- * The effective duration of qos request in usecs. After
- * timeout, qos request is cancelled automatically.
- * Kept 80ms default, inline with default GPU idle time.
- */
-#define KGSL_L2PC_CPU_TIMEOUT	(80 * 1000)
-
 /* Order deeply matters here because reasons. New entries go on the end */
 static const char * const clocks[] = {
 	"src_clk",
@@ -510,12 +503,14 @@ EXPORT_SYMBOL(kgsl_pwrctrl_set_constraint);
 /**
  * kgsl_pwrctrl_update_l2pc() - Update existing qos request
  * @device: Pointer to the kgsl_device struct
+ * @timeout_us: the effective duration of qos request in usecs.
  *
  * Updates an existing qos request to avoid L2PC on the
  * CPUs (which are selected through dtsi) on which GPU
  * thread is running. This would help for performance.
  */
-void kgsl_pwrctrl_update_l2pc(struct kgsl_device *device)
+void kgsl_pwrctrl_update_l2pc(struct kgsl_device *device,
+			unsigned long timeout_us)
 {
 	int cpu;
 
@@ -529,7 +524,7 @@ void kgsl_pwrctrl_update_l2pc(struct kgsl_device *device)
 		pm_qos_update_request_timeout(
 				&device->pwrctrl.l2pc_cpus_qos,
 				device->pwrctrl.pm_qos_cpu_mask_latency,
-				KGSL_L2PC_CPU_TIMEOUT);
+				timeout_us);
 	}
 }
 EXPORT_SYMBOL(kgsl_pwrctrl_update_l2pc);
@@ -1012,6 +1007,8 @@ static void __force_on(struct kgsl_device *device, int flag, int on)
 	if (on) {
 		switch (flag) {
 		case KGSL_PWRFLAGS_CLK_ON:
+			/* make sure pwrrail is ON before enabling clocks */
+			kgsl_pwrctrl_pwrrail(device, KGSL_PWRFLAGS_ON);
 			kgsl_pwrctrl_clk(device, KGSL_PWRFLAGS_ON,
 				KGSL_STATE_ACTIVE);
 			break;
@@ -1805,7 +1802,12 @@ static int kgsl_pwrctrl_pwrrail(struct kgsl_device *device, int state)
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 	int status = 0;
 
-	if (test_bit(KGSL_PWRFLAGS_POWER_ON, &pwr->ctrl_flags))
+	/*
+	 * Disabling the regulator means also disabling dependent clocks.
+	 * Hence don't disable it if force clock ON is set.
+	 */
+	if (test_bit(KGSL_PWRFLAGS_POWER_ON, &pwr->ctrl_flags) ||
+		test_bit(KGSL_PWRFLAGS_CLK_ON, &pwr->ctrl_flags))
 		return 0;
 
 	if (state == KGSL_PWRFLAGS_OFF) {
@@ -2133,6 +2135,10 @@ int kgsl_pwrctrl_init(struct kgsl_device *device)
 
 	kgsl_property_read_u32(device, "qcom,l2pc-cpu-mask",
 			&pwr->l2pc_cpus_mask);
+
+	pwr->l2pc_update_queue = of_property_read_bool(
+				device->pdev->dev.of_node,
+				"qcom,l2pc-update-queue");
 
 	pm_runtime_enable(&pdev->dev);
 
@@ -3015,7 +3021,7 @@ EXPORT_SYMBOL(kgsl_pwr_limits_add);
 void kgsl_pwr_limits_del(void *limit_ptr)
 {
 	struct kgsl_pwr_limit *limit = limit_ptr;
-	if (IS_ERR(limit))
+	if (IS_ERR_OR_NULL(limit))
 		return;
 
 	_update_limits(limit, KGSL_PWR_DEL_LIMIT, 0);
@@ -3036,7 +3042,7 @@ int kgsl_pwr_limits_set_freq(void *limit_ptr, unsigned int freq)
 	struct kgsl_pwr_limit *limit = limit_ptr;
 	int level;
 
-	if (IS_ERR(limit))
+	if (IS_ERR_OR_NULL(limit))
 		return -EINVAL;
 
 	pwr = &limit->device->pwrctrl;
@@ -3058,7 +3064,7 @@ void kgsl_pwr_limits_set_default(void *limit_ptr)
 {
 	struct kgsl_pwr_limit *limit = limit_ptr;
 
-	if (IS_ERR(limit))
+	if (IS_ERR_OR_NULL(limit))
 		return;
 
 	_update_limits(limit, KGSL_PWR_SET_LIMIT, 0);

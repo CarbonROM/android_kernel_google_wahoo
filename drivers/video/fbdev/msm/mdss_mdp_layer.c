@@ -1831,9 +1831,15 @@ static int __validate_secure_session(struct mdss_overlay_private *mdp5_data)
 		pr_err("secure-camera cnt:%d secure video:%d secure display:%d\n",
 				secure_cam_pipes, secure_vid_pipes, sd_pipes);
 		return -EINVAL;
-	} else {
-		return 0;
+	} else if (mdp5_data->ctl->is_video_mode &&
+		((sd_pipes && !mdp5_data->sd_enabled) ||
+		(!sd_pipes && mdp5_data->sd_enabled)) &&
+		!mdp5_data->cache_null_commit) {
+		pr_err("NULL commit missing before display secure session entry/exit\n");
+		return -EINVAL;
 	}
+
+	return 0;
 }
 
 /*
@@ -3065,6 +3071,14 @@ int mdss_mdp_layer_pre_commit_wfd(struct msm_fb_data_type *mfd,
 		sync_pt_data = &mfd->mdp_sync_pt_data;
 		mutex_lock(&sync_pt_data->sync_mutex);
 		count = sync_pt_data->acq_fen_cnt;
+
+		if (count >= MDP_MAX_FENCE_FD) {
+			pr_err("Reached maximum possible value for fence count\n");
+			mutex_unlock(&sync_pt_data->sync_mutex);
+			rc = -EINVAL;
+			goto input_layer_err;
+		}
+
 		sync_pt_data->acq_fen[count] = fence;
 		sync_pt_data->acq_fen_cnt++;
 		mutex_unlock(&sync_pt_data->sync_mutex);
