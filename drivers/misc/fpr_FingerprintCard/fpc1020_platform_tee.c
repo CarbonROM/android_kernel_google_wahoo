@@ -36,6 +36,8 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/wakelock.h>
+#include <linux/input.h>
+#include <linux/state_notifier.h>
 
 #define FPC_TTW_HOLD_TIME 1000
 
@@ -49,6 +51,10 @@
 #define PWR_ON_SLEEP_MAX_US (PWR_ON_SLEEP_MIN_US + 900)
 
 #define NUM_PARAMS_REG_ENABLE_SET 2
+
+#define KEY_FINGERPRINT 0x2ee
+
+static struct notifier_block notif;
 
 static const char * const pctl_names[] = {
 	"fpc1020_reset_reset",
@@ -79,6 +85,7 @@ struct fpc1020_data {
 	struct mutex lock; /* To set/get exported values in sysfs */
 	bool prepared;
 	atomic_t wakeup_enabled; /* Used both in ISR and non-ISR */
+	struct input_dev *input_dev;
 };
 
 static int vreg_setup(struct fpc1020_data *fpc1020, const char *name,
@@ -437,6 +444,50 @@ static const struct attribute_group attribute_group = {
 	.attrs = attributes,
 };
 
+static void set_fingerprint_nice(int nice)
+{
+	struct task_struct *p;
+
+	read_lock(&tasklist_lock);
+	for_each_process(p) {
+		if (!memcmp(p->comm, "fingerprint", 12)) {
+			set_user_nice(p, nice);
+			break;
+		}
+	}
+	read_unlock(&tasklist_lock);
+}
+
+static int fpc1020_input_init(struct fpc1020_data * fpc1020)
+{
+	int ret;
+
+	fpc1020->input_dev = input_allocate_device();
+	if (!fpc1020->input_dev) {
+		pr_err("fingerprint input boost allocation is fucked - 1 star\n");
+		ret = -ENOMEM;
+		goto exit;
+	}
+
+	fpc1020->input_dev->name = "fpc1020";
+	fpc1020->input_dev->evbit[0] = BIT(EV_KEY);
+
+	set_bit(KEY_FINGERPRINT, fpc1020->input_dev->keybit);
+
+	ret = input_register_device(fpc1020->input_dev);
+	if (ret) {
+		pr_err("fingerprint boost input registration is fucked - fixpls\n");
+		goto err_free_dev;
+	}
+
+	return 0;
+
+err_free_dev:
+	input_free_device(fpc1020->input_dev);
+exit:
+	return ret;
+}
+
 static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 {
 	struct fpc1020_data *fpc1020 = handle;
@@ -449,6 +500,12 @@ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 	}
 
 	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
+
+	if (state_suspended) {
+		input_report_key(fpc1020->input_dev, KEY_FINGERPRINT, 1);
+		input_sync(fpc1020->input_dev);
+		input_report_key(fpc1020->input_dev, KEY_FINGERPRINT, 0);		input_sync(fpc1020->input_dev);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -555,6 +612,9 @@ static int fpc1020_probe(struct platform_device *pdev)
 			"select_pin_ctl fpc1020_irq_active failed.\n");
 		goto exit;
 	}
+	rc = fpc1020_input_init(fpc1020);
+	if (rc)
+		goto exit;
 
 	atomic_set(&fpc1020->wakeup_enabled, 0);
 
@@ -600,9 +660,29 @@ exit:
 	return rc;
 }
 
+static int state_notifier_callback(struct notifier_block *this,
+				unsigned long event, void *data)
+{
+	switch (event) {
+		case STATE_NOTIFIER_ACTIVE:
+			set_fingerprint_nice(2);
+			break;
+		case STATE_NOTIFIER_SUSPEND:
+			set_fingerprint_nice(-1);
+			break;
+		default:
+			break;
+	}
+
+	return NOTIFY_OK;
+}
+
 static int fpc1020_remove(struct platform_device *pdev)
 {
 	struct fpc1020_data *fpc1020 = platform_get_drvdata(pdev);
+
+	if (fpc1020->input_dev != NULL)
+		input_free_device(fpc1020->input_dev);
 
 	sysfs_remove_group(&pdev->dev.kobj, &attribute_group);
 	mutex_destroy(&fpc1020->lock);
@@ -639,6 +719,10 @@ static int __init fpc1020_init(void)
 		pr_info("%s OK\n", __func__);
 	else
 		pr_err("%s %d\n", __func__, rc);
+
+	notif.notifier_call = state_notifier_callback;
+	if (state_register_client(&notif))
+		pr_err("Cannot register State notifier callback for fpc1020.\n");
 
 	return rc;
 }

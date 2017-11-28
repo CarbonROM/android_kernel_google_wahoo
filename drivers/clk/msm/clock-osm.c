@@ -3146,6 +3146,41 @@ static int clk_osm_acd_init(struct clk_osm *c)
 	return 0;
 }
 
+ssize_t cpu_clock_get_vdd(char *buf)
+{
+	int i;
+	ssize_t count = 0;
+	u32 uv;
+	unsigned long rate = 0;
+
+	if (!buf)
+		return 0;
+
+	for (i = 0; i < pwrcl_clk.c.num_fmax; i++) {
+		rate = pwrcl_clk.c.fmax[i];
+		uv = find_voltage(&pwrcl_clk, rate);
+		if (uv <= 0) {
+			return -EINVAL;
+		}
+		count += sprintf(buf + count, "LP: %lumhz: %lu mV\n",
+					rate / 1000000,
+					(unsigned long)uv / 1000);
+	}
+
+	for (i = 0; i < perfcl_clk.c.num_fmax; i++) {
+		rate = perfcl_clk.c.fmax[i];
+		uv = find_voltage(&perfcl_clk, rate);
+		if (uv <= 0) {
+			return -EINVAL;
+		}
+		count += sprintf(buf + count, "HP: %lumhz: %lu mV\n",
+					rate / 1000000,
+					(unsigned long)uv / 1000);
+	}
+
+	return count;
+}
+
 static unsigned long init_rate = 300000000;
 static unsigned long osm_clk_init_rate = 200000000;
 

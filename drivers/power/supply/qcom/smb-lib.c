@@ -22,12 +22,17 @@
 #include <linux/irq.h>
 #include <linux/wakelock.h>
 #include <linux/pmic-voter.h>
+#include <linux/module.h>
 #include "smb-lib.h"
 #include "smb-reg.h"
 #include "battery.h"
 #include "storm-watch.h"
 
 static void *smblib_ipc_log;
+
+unsigned int fastcharge_current = 900000;
+module_param(fastcharge_current, uint, 0664);
+
 
 #define smblib_err(chg, fmt, ...)				\
 	do {							\
@@ -875,6 +880,13 @@ static int smblib_usb_icl_vote_callback(struct votable *votable, void *data,
 	pd_icl_ua = get_client_vote_locked(votable, PD_VOTER);
 	default_icl_ua = get_client_vote_locked(votable, DEFAULT_VOTER);
 	usb_icl_ua = get_client_vote_locked(votable, USB_PSY_VOTER);
+
+        // Force enable fast charge
+        if (usb_icl_ua <= USBIN_500MA) {
+		if (fastcharge_current > USBIN_1500MA)
+			fastcharge_current = USBIN_1500MA;
+            usb_icl_ua = fastcharge_current;
+        }
 
 	/* PD and Type-C current */
 	if (pd_icl_ua > 0) {
