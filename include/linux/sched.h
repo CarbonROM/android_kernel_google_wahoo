@@ -2032,6 +2032,8 @@ struct task_struct {
 	unsigned long	task_state_change;
 #endif
 	int pagefault_disabled;
+/* CPU-bound kernel thread */
+	bool kthread_per_cpu;
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*
