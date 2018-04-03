@@ -428,7 +428,6 @@ static void bm_watch_work(struct work_struct *work)
 						struct battery_manager,
 						bm_watch.work);
 	int rc, batt_volt, batt_temp, ibat_max = 0;
-	int batt_ocv, batt_res, charge_counter, charge_raw;
 
 	mutex_lock(&bm->work_lock);
 
@@ -456,40 +455,12 @@ static void bm_watch_work(struct work_struct *work)
 			     POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
 			     &ibat_max);
 
-	rc = bm_get_property(bm->bms_psy,
-			POWER_SUPPLY_PROP_VOLTAGE_OCV, &batt_ocv);
-	if (rc < 0) {
-		pr_bm(ERROR, "Couldn't get BATT_OCV = %d\n", rc);
-		goto error;
-	}
-
-	rc = bm_get_property(bm->bms_psy,
-			POWER_SUPPLY_PROP_RESISTANCE, &batt_res);
-	if (rc < 0) {
-		pr_bm(ERROR, "Couldn't get BATT_RES = %d\n", rc);
-		goto error;
-	}
-
-	rc = bm_get_property(bm->bms_psy,
-			POWER_SUPPLY_PROP_CHARGE_COUNTER, &charge_counter);
-	if (rc < 0) {
-		pr_bm(ERROR, "Couldn't get CHARGE_COUNTER = %d\n", rc);
-		goto error;
-	}
-
-	rc = bm_get_property(bm->bms_psy,
-			POWER_SUPPLY_PROP_CHARGE_FULL, &charge_raw);
-	if (rc < 0) {
-		pr_bm(ERROR, "Couldn't get CHARGE_RAW = %d\n", rc);
-		goto error;
-	}
-
 	pr_bm(VERBOSE, "PRESENT:%d, CHG_STAT:%d, THM_STAT:%d, " \
-		"BAT_TEMP:%d, BAT_VOLT:%d, BAT_OCV:%d, VOTE_CUR:%d, " \
-		"SET_CUR:%d, BATT_RES:%d, BATT_CC:%d, BATT_CAPA:%d \n",
+		"BAT_TEMP:%d, BAT_VOLT:%d, VOTE_CUR:%d, " \
+		"SET_CUR:%d \n",
 			bm->chg_present, bm->chg_status, bm->therm_stat,
-			batt_temp, batt_volt, batt_ocv, bm_vote_fcc_get(bm),
-			ibat_max, batt_res, charge_counter, charge_raw);
+			batt_temp, batt_volt, bm_vote_fcc_get(bm),
+			ibat_max);
 
 error:
 	mutex_unlock(&bm->work_lock);
@@ -670,25 +641,47 @@ static int bm_init(struct battery_manager *bm)
 	bm->batt_psy = power_supply_get_by_name("battery");
 	if (!bm->batt_psy) {
 		pr_bm(ERROR, "Couldn't get batt_psy\n");
-		return -ENODEV;
+		return -EPROBE_DEFER;
 	}
 
 	bm->usb_psy = power_supply_get_by_name("usb");
 	if (!bm->usb_psy) {
 		pr_bm(ERROR, "Couldn't get usb_psy\n");
-		return -ENODEV;
+		return -EPROBE_DEFER;
 	}
 
 	bm->pl_psy = power_supply_get_by_name("parallel");
 	if (!bm->pl_psy) {
 		pr_bm(ERROR, "Couldn't get pl_psy\n");
-		return -ENODEV;
+		return -EPROBE_DEFER;
 	}
 
 	bm->bms_psy = power_supply_get_by_name("bms");
 	if (!bm->bms_psy) {
 		pr_bm(ERROR, "Couldn't get bms_psy\n");
-		return -ENODEV;
+		return -EPROBE_DEFER;
+	}
+
+	rc = bm_get_property(bm->bms_psy,
+			     POWER_SUPPLY_PROP_RESISTANCE_ID, &batt_id);
+	if (rc < 0) {
+		bm->batt_id = BM_BATT_TOCAD;
+	} else {
+		if (!batt_id) {
+			pr_bm(ERROR, "Battery id is zero, deferring probe!\n");
+			return -EPROBE_DEFER;
+		}
+
+		for (i = 0; i < BM_BATT_MAX; i++) {
+			if (valid_batt_id[i].min <= batt_id &&
+			    valid_batt_id[i].max >= batt_id)
+				break;
+		}
+		if (i == BM_BATT_MAX) {
+			pr_bm(ERROR, "Couldn't get valid battery id\n");
+			return -EINVAL;
+		}
+		bm->batt_id = i;
 	}
 
 	rc = bm_get_property(bm->batt_psy,
@@ -715,23 +708,6 @@ static int bm_init(struct battery_manager *bm)
 			     POWER_SUPPLY_PROP_PRESENT, &bm->chg_present);
 	if (rc < 0)
 		bm->chg_present = 0;
-
-	rc = bm_get_property(bm->bms_psy,
-			     POWER_SUPPLY_PROP_RESISTANCE_ID, &batt_id);
-	if (rc < 0) {
-		bm->batt_id = BM_BATT_TOCAD;
-	} else {
-		for (i = 0; i < BM_BATT_MAX; i++) {
-			if (valid_batt_id[i].min <= batt_id &&
-			    valid_batt_id[i].max >= batt_id)
-				break;
-		}
-		if (i == BM_BATT_MAX) {
-			pr_bm(ERROR, "Couldn't get valid battery id\n");
-			return -EINVAL;
-		}
-		bm->batt_id = i;
-	}
 
 	if (bm->chg_present) {
 		bm->demo_iusb = 1;
@@ -923,6 +899,6 @@ static struct kernel_param_ops demo_mode_ops = {
 module_param_cb(demo_mode, &demo_mode_ops, &demo_mode, 0644);
 MODULE_PARM_DESC(demo_mode, "VZW Demo mode <on|off>");
 
-late_initcall(lge_battery_init);
+module_init(lge_battery_init);
 module_exit(lge_battery_exit);
 MODULE_LICENSE("GPL");

@@ -28,8 +28,8 @@
 #include <asm/errno.h>
 #include <asm/esr.h>
 #include <asm/irq.h>
-#include <asm/memory.h>
 #include <asm/mmu.h>
+#include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/thread_info.h>
 #include <asm/uaccess.h>
@@ -138,7 +138,7 @@ alternative_else_nop_endif
 	ldr	x20, [tsk, #TI_ADDR_LIMIT]
 #endif
 	str	x20, [sp, #S_ORIG_ADDR_LIMIT]
-	mov	x20, #TASK_SIZE_64
+	mov	x20, #USER_DS
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 	str	x20, [tsk, #TSK_TI_ADDR_LIMIT]
 #else
@@ -940,6 +940,7 @@ el0_svc_naked:					// compat entry point
 	b.ne	__sys_trace
 	cmp     scno, sc_nr                     // check upper syscall limit
 	b.hs	ni_sys
+	mask_nospec64 scno, sc_nr, x19		// enforce bounds for syscall number
 	ldr	x16, [stbl, scno, lsl #3]	// address in the syscall table
 	blr	x16				// call sys_* routine
 	b	ret_fast_syscall

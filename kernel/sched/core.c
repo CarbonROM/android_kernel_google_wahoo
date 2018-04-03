@@ -622,7 +622,8 @@ void resched_cpu(int cpu)
 	unsigned long flags;
 
 	raw_spin_lock_irqsave(&rq->lock, flags);
-	resched_curr(rq);
+	if (cpu_online(cpu) || cpu == smp_processor_id())
+		resched_curr(rq);
 	raw_spin_unlock_irqrestore(&rq->lock, flags);
 }
 
@@ -3335,12 +3336,12 @@ static void __sched notrace __schedule(bool preempt)
 
 		trace_sched_switch(preempt, prev, next);
 
-		/* Log and trace when scheduling a long-delayed task */
+		/* Log when scheduling a long-delayed task */
 		now = cpu_clock(cpu);
 		prev->waiting_time = now;
 		if (!is_idle_task(next) &&
 		    now > next->waiting_time + NSEC_PER_SEC) {
-			printk("task wait timing: "
+			printk_ratelimited("task wait timing: "
 			       "prev->tgid: %d, prev->pid: %d, "
 			       "prev->prio: %d, prev->vruntime: %llu, "
 			       "next->tgid: %d, next->pid: %d, "
