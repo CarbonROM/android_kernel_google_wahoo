@@ -33,6 +33,7 @@
 #include <linux/hrtimer.h>
 #include <asm-generic/cputime.h>
 #include <linux/wakelock.h>
+#include <linux/wahoo_info.h>
 
 /* Tunables */
 #define WG_DEBUG		0
@@ -127,35 +128,14 @@ static struct work_struct s2w_input_work;
 static struct work_struct dt2w_input_work;
 static struct wake_lock dt2w_wakelock;
 
-//get hardware type
 static int hw_version = TAIMEN;
-static int __init get_model(char *cmdline_model)
-{
-	if (strstr(cmdline_model, "walleye")) {
-		sweep_y_limit = SWEEP_Y_LIMIT_WALLEYE;
-		sweep_x_limit = SWEEP_X_LIMIT_WALLEYE;
-		sweep_x_b1 = SWEEP_X_B1_WALLEYE;
-		sweep_x_b2 = SWEEP_X_B2_WALLEYE;
-		sweep_y_start = SWEEP_Y_START_WALLEYE;
-		sweep_x_start = SWEEP_X_START_WALLEYE;
-		sweep_x_final = SWEEP_X_FINAL_WALLEYE;
-		sweep_y_next = SWEEP_Y_NEXT_WALLEYE;
-		sweep_x_max = SWEEP_X_MAX_WALLEYE;
-		sweep_edge = SWEEP_EDGE_WALLEYE;
-		hw_version = WALLEYE;
-	}
-
-	return 0;
-}
-__setup("androidboot.hardware=", get_model);
 
 static bool is_suspended(void)
 {
-#if IS_ENABLED(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_CORE_HTC)
-	return scr_suspended();
-#else
-	return scr_suspended_taimen();
-#endif
+	if (hw_version == WALLEYE)
+		return scr_suspended();
+	else
+		return scr_suspended_taimen();
 }
 
 /* Wake Gestures */
@@ -728,15 +708,25 @@ static DEVICE_ATTR(vib_strength, (S_IWUSR|S_IRUGO),
  * INIT / EXIT stuff below here
  */
 
-#if IS_ENABLED(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_CORE_HTC)
 extern struct kobject *android_touch_kobj;
-#else
-struct kobject *android_touch_kobj;
-#endif
 
 static int __init wake_gestures_init(void)
 {
 	int rc = 0;
+
+	if (is_google_walleye()) {
+		sweep_y_limit = SWEEP_Y_LIMIT_WALLEYE;
+		sweep_x_limit = SWEEP_X_LIMIT_WALLEYE;
+		sweep_x_b1 = SWEEP_X_B1_WALLEYE;
+		sweep_x_b2 = SWEEP_X_B2_WALLEYE;
+		sweep_y_start = SWEEP_Y_START_WALLEYE;
+		sweep_x_start = SWEEP_X_START_WALLEYE;
+		sweep_x_final = SWEEP_X_FINAL_WALLEYE;
+		sweep_y_next = SWEEP_Y_NEXT_WALLEYE;
+		sweep_x_max = SWEEP_X_MAX_WALLEYE;
+		sweep_edge = SWEEP_EDGE_WALLEYE;
+		hw_version = WALLEYE;
+	}
 
 	wake_dev = input_allocate_device();
 	if (!wake_dev) {
@@ -793,14 +783,13 @@ static int __init wake_gestures_init(void)
 	}
 #endif
 
-
-#if !IS_ENABLED(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_CORE_HTC)
-	android_touch_kobj = kobject_create_and_add("android_touch", NULL);
-	if (android_touch_kobj == NULL) {
-		pr_err("%s: subsystem_register failed\n", __func__);
-		goto err_input_dev;
+	if (hw_version == TAIMEN) {
+		android_touch_kobj = kobject_create_and_add("android_touch", NULL);
+		if (android_touch_kobj == NULL) {
+			pr_err("%s: subsystem_register failed\n", __func__);
+			goto err_input_dev;
+		}
 	}
-#endif
 	rc = sysfs_create_file(android_touch_kobj, &dev_attr_sweep2wake.attr);
 	if (rc) {
 		pr_warn("%s: sysfs_create_file failed for sweep2wake\n", __func__);
