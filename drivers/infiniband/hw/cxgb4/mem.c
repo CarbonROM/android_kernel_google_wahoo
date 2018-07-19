@@ -478,7 +478,7 @@ static int build_phys_page_list(struct ib_phys_buf *buffer_list,
 	if (!*npages)
 		return -EINVAL;
 
-	*page_list = kmalloc(sizeof(u64) * *npages, GFP_KERNEL);
+	*page_list = kmalloc_array(*npages, sizeof(u64), GFP_KERNEL);
 	if (!*page_list)
 		return -ENOMEM;
 
@@ -926,7 +926,7 @@ static int c4iw_set_page(struct ib_mr *ibmr, u64 addr)
 {
 	struct c4iw_mr *mhp = to_c4iw_mr(ibmr);
 
-	if (unlikely(mhp->mpl_len == mhp->max_mpl_len))
+	if (unlikely(mhp->mpl_len == mhp->attr.pbl_size))
 		return -ENOMEM;
 
 	mhp->mpl[mhp->mpl_len++] = addr;

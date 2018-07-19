@@ -663,6 +663,7 @@ find_check_entry(struct ipt_entry *e, struct net *net, const char *name,
 		return -ENOMEM;
 
 	j = 0;
+	memset(&mtpar, 0, sizeof(mtpar));
 	mtpar.net	= net;
 	mtpar.table     = name;
 	mtpar.entryinfo = &e->ip;
@@ -1203,7 +1204,7 @@ __do_replace(struct net *net, const char *name, unsigned int valid_hooks,
 	struct ipt_entry *iter;
 
 	ret = 0;
-	counters = vzalloc(num_counters * sizeof(struct xt_counters));
+	counters = vzalloc(array_size(num_counters, sizeof(struct xt_counters)));
 	if (!counters) {
 		ret = -ENOMEM;
 		goto out;
