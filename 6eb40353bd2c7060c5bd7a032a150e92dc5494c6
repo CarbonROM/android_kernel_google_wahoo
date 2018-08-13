@@ -1,0 +1,4 @@
+{
+  "pushCert": "certificate version 0.1\npusher RJ Trujillo \u003ccertifiedblyndguy@gmail.com\u003e 1534200009 -0600\npushee ssh://review.carbonrom.org:29418/CarbonROM/android_kernel_google_wahoo\nnonce 1534200008-1B82E9463B7F22E4037D07A21ABC98CC65DE6EFE\n\n0000000000000000000000000000000000000000 6eb40353bd2c7060c5bd7a032a150e92dc5494c6 refs/for/cr-6.1/state-aware-fsync\n-----BEGIN PGP SIGNATURE-----\n\niNAEAAEIADoWIQSoaxIDJ8jLL9D5Uwx7qeYAqLi7FgUCW3IIyRwcY2VydGlmaWVk\nYmx5bmRndXlAZ21haWwuY29tAAoJEHup5gCouLsW6KID/0H4IgjnLe2NKCizs8J0\npnFuc6xiwV+Jp5lfoKIyB4wqw2PIuWVhFWRc8Z+oDAQmIUMrJrbY1pFBNAbjm4gB\nu8PLvY7v6ZaqhDtDiINceuxCOdn3iy30IlyuLUWMDaDmc8fYQ4tmRsgGd4XqNaPt\nE0NJMU6D1ytsWOgflFc+Mdhp\n\u003dGcl1\n-----END PGP SIGNATURE-----\n",
+  "comments": []
+}
