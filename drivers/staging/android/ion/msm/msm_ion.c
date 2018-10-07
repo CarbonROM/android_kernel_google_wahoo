@@ -550,8 +550,7 @@ static struct ion_platform_data *msm_ion_parse_dt(struct platform_device *pdev)
 	if (!pdata)
 		return ERR_PTR(-ENOMEM);
 
-	heaps = kcalloc(num_heaps, sizeof(struct ion_platform_heap),
-			GFP_KERNEL);
+	heaps = kzalloc(sizeof(struct ion_platform_heap)*num_heaps, GFP_KERNEL);
 	if (!heaps) {
 		kfree(pdata);
 		return ERR_PTR(-ENOMEM);
@@ -725,13 +724,16 @@ long msm_ion_custom_ioctl(struct ion_client *client,
 		struct mm_struct *mm = current->active_mm;
 
 		if (data.flush_data.handle > 0) {
-			handle = ion_handle_get_by_id(client,
+			mutex_lock(&client->lock);
+			handle = ion_handle_get_by_id_nolock(client,
 						(int)data.flush_data.handle);
 			if (IS_ERR(handle)) {
+				mutex_unlock(&client->lock);
 				pr_info("%s: Could not find handle: %d\n",
 					__func__, (int)data.flush_data.handle);
 				return PTR_ERR(handle);
 			}
+			mutex_unlock(&client->lock);
 		} else {
 			handle = ion_import_dma_buf(client, data.flush_data.fd);
 			if (IS_ERR(handle)) {

@@ -310,7 +310,7 @@ static int xhci_setup_msix(struct xhci_hcd *xhci)
 				HCS_MAX_INTRS(xhci->hcs_params1));
 
 	xhci->msix_entries =
-		kmalloc_array(xhci->msix_count, sizeof(struct msix_entry),
+		kmalloc((sizeof(struct msix_entry))*xhci->msix_count,
 				GFP_KERNEL);
 	if (!xhci->msix_entries) {
 		xhci_err(xhci, "Failed to allocate MSI-X entries\n");
@@ -1419,7 +1419,7 @@ int xhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 	if (!urb_priv)
 		return -ENOMEM;
 
-	buffer = kcalloc(size, sizeof(struct xhci_td), mem_flags);
+	buffer = kzalloc(size * sizeof(struct xhci_td), mem_flags);
 	if (!buffer) {
 		kfree(urb_priv);
 		return -ENOMEM;
@@ -3693,6 +3693,9 @@ void xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 	}
 
 	spin_lock_irqsave(&xhci->lock, flags);
+
+	virt_dev->udev = NULL;
+
 	/* Don't disable the slot if the host controller is dead. */
 	state = readl(&xhci->op_regs->status);
 	if (state == 0xffffffff || (xhci->xhc_state & XHCI_STATE_DYING) ||
