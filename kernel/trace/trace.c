@@ -1392,17 +1392,17 @@ static inline void set_cmdline(int idx, const char *cmdline)
 static int allocate_cmdlines_buffer(unsigned int val,
 				    struct saved_cmdlines_buffer *s)
 {
-	s->map_cmdline_to_pid = vmalloc(val * sizeof(*s->map_cmdline_to_pid));
+	s->map_cmdline_to_pid = vmalloc(array_size(val, sizeof(*s->map_cmdline_to_pid)));
 	if (!s->map_cmdline_to_pid)
 		return -ENOMEM;
 
-	s->saved_cmdlines = vmalloc(val * TASK_COMM_LEN);
+	s->saved_cmdlines = vmalloc(array_size(TASK_COMM_LEN, val));
 	if (!s->saved_cmdlines) {
 		vfree(s->map_cmdline_to_pid);
 		return -ENOMEM;
 	}
 
-	s->saved_tgids = vmalloc(val * sizeof(*s->saved_tgids));
+	s->saved_tgids = vmalloc(array_size(val, sizeof(*s->saved_tgids)));
 	if (!s->saved_tgids) {
 		vfree(s->saved_cmdlines);
 		vfree(s->map_cmdline_to_pid);
@@ -1793,7 +1793,17 @@ void trace_buffer_unlock_commit_regs(struct trace_array *tr,
 {
 	__buffer_unlock_commit(buffer, event);
 
-	ftrace_trace_stack(tr, buffer, flags, 0, pc, regs);
+	/*
+	 * If regs is not set, then skip the following callers:
+	 *   trace_buffer_unlock_commit_regs
+	 *   event_trigger_unlock_commit
+	 *   trace_event_buffer_commit
+	 *   trace_event_raw_event_sched_switch
+	 * Note, we can still get here via blktrace, wakeup tracer
+	 * and mmiotrace, but that's ok if they lose a function or
+	 * two. They are that meaningful.
+	 */
+	ftrace_trace_stack(tr, buffer, flags, regs ? 0 : 4, pc, regs);
 	ftrace_trace_userstack(buffer, flags, pc);
 }
 EXPORT_SYMBOL_GPL(trace_buffer_unlock_commit_regs);
@@ -1850,6 +1860,13 @@ static void __ftrace_trace_stack(struct ring_buffer *buffer,
 
 	trace.nr_entries	= 0;
 	trace.skip		= skip;
+
+	/*
+	 * Add two, for this function and the call to save_stack_trace()
+	 * If regs is set, then these functions will not be in the way.
+	 */
+	if (!regs)
+		trace.skip += 2;
 
 	/*
 	 * Since events can happen in NMIs there's no safe way to
@@ -4169,7 +4186,7 @@ trace_insert_enum_map_file(struct module *mod, struct trace_enum_map **start,
 	 * where the head holds the module and length of array, and the
 	 * tail holds a pointer to the next list.
 	 */
-	map_array = kmalloc(sizeof(*map_array) * (len + 2), GFP_KERNEL);
+	map_array = kmalloc_array(len + 2, sizeof(*map_array), GFP_KERNEL);
 	if (!map_array) {
 		pr_warning("Unable to allocate trace enum mapping\n");
 		return;
@@ -4240,7 +4257,7 @@ tracing_saved_tgids_read(struct file *file, char __user *ubuf,
 	int pid;
 	int i;
 
-	file_buf = vmalloc(savedcmd->cmdline_num*(16+1+16));
+	file_buf = vmalloc(array_size(savedcmd->cmdline_num, (16 + 1 + 16)));
 	if (!file_buf)
 		return -ENOMEM;
 

@@ -559,7 +559,7 @@ get_server_iovec(struct TCP_Server_Info *server, unsigned int nr_segs)
 		return server->iov;
 
 	/* not big enough -- allocate a new one and release the old */
-	new_iov = kmalloc(sizeof(*new_iov) * nr_segs, GFP_NOFS);
+	new_iov = kmalloc_array(nr_segs, sizeof(*new_iov), GFP_NOFS);
 	if (new_iov) {
 		kfree(server->iov);
 		server->iov = new_iov;
@@ -3674,6 +3674,9 @@ try_mount_again:
 	if (IS_ERR(tcon)) {
 		rc = PTR_ERR(tcon);
 		tcon = NULL;
+		if (rc == -EACCES)
+			goto mount_fail_check;
+
 		goto remote_path_check;
 	}
 

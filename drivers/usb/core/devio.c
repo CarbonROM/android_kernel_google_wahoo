@@ -799,7 +799,7 @@ static int parse_usbdevfs_streams(struct usb_dev_state *ps,
 	if (num_streams_ret && (num_streams < 2 || num_streams > 65536))
 		return -EINVAL;
 
-	eps = kmalloc(num_eps * sizeof(*eps), GFP_KERNEL);
+	eps = kmalloc_array(num_eps, sizeof(*eps), GFP_KERNEL);
 	if (!eps)
 		return -ENOMEM;
 
@@ -1329,8 +1329,6 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
 	u = 0;
 	switch (uurb->type) {
 	case USBDEVFS_URB_TYPE_CONTROL:
-		if (is_in)
-			allow_short = true;
 		if (!usb_endpoint_xfer_control(&ep->desc))
 			return -EINVAL;
 		/* min 8 byte setup packet */
@@ -1360,6 +1358,8 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
 			is_in = 0;
 			uurb->endpoint &= ~USB_DIR_IN;
 		}
+		if (is_in)
+			allow_short = true;
 		snoop(&ps->dev->dev, "control urb: bRequestType=%02x "
 			"bRequest=%02x wValue=%04x "
 			"wIndex=%04x wLength=%04x\n",
@@ -1459,8 +1459,9 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
 	as->mem_usage = u;
 
 	if (num_sgs) {
-		as->urb->sg = kmalloc(num_sgs * sizeof(struct scatterlist),
-				      GFP_KERNEL);
+		as->urb->sg = kmalloc_array(num_sgs,
+					    sizeof(struct scatterlist),
+					    GFP_KERNEL);
 		if (!as->urb->sg) {
 			ret = -ENOMEM;
 			goto error;

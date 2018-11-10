@@ -27,6 +27,7 @@
 #include <linux/cgroup.h>
 #include <linux/module.h>
 #include <linux/sort.h>
+#include <linux/nospec.h>
 
 #include "vhost.h"
 
@@ -346,10 +347,13 @@ static long vhost_dev_alloc_iovecs(struct vhost_dev *dev)
 
 	for (i = 0; i < dev->nvqs; ++i) {
 		vq = dev->vqs[i];
-		vq->indirect = kmalloc(sizeof *vq->indirect * UIO_MAXIOV,
-				       GFP_KERNEL);
-		vq->log = kmalloc(sizeof *vq->log * UIO_MAXIOV, GFP_KERNEL);
-		vq->heads = kmalloc(sizeof *vq->heads * UIO_MAXIOV, GFP_KERNEL);
+		vq->indirect = kmalloc_array(UIO_MAXIOV,
+					     sizeof(*vq->indirect),
+					     GFP_KERNEL);
+		vq->log = kmalloc_array(UIO_MAXIOV, sizeof(*vq->log),
+					GFP_KERNEL);
+		vq->heads = kmalloc_array(UIO_MAXIOV, sizeof(*vq->heads),
+					  GFP_KERNEL);
 		if (!vq->indirect || !vq->log || !vq->heads)
 			goto err_nomem;
 	}
@@ -748,6 +752,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, int ioctl, void __user *argp)
 	if (idx >= d->nvqs)
 		return -ENOBUFS;
 
+	idx = array_index_nospec(idx, d->nvqs);
 	vq = d->vqs[idx];
 
 	mutex_lock(&vq->mutex);
