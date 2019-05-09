@@ -57,7 +57,8 @@ static void etm4_os_unlock(void *info)
 
 static bool etm4_arch_supported(u8 arch)
 {
-	switch (arch) {
+	/* Mask out the minor version number */
+	switch (arch & 0xf0) {
 	case ETM_ARCH_V4:
 		break;
 	default:
@@ -2204,7 +2205,7 @@ static ssize_t name##_show(struct device *_dev,				\
 	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
 			 readl_relaxed(drvdata->base + offset));	\
 }									\
-DEVICE_ATTR_RO(name)
+static DEVICE_ATTR_RO(name)
 
 coresight_simple_func(trcoslsr, TRCOSLSR);
 coresight_simple_func(trcpdcr, TRCPDCR);
